@@ -1,6 +1,6 @@
 *.class
 .classpath
-*.exteranlToolBuilders/
+*.externalToolBuilders/
 .project
 lib/
 openoffice-install.*
