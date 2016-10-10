@@ -1,4 +1,9 @@
 *.class
+.classpath
+*.exteranlToolBuilders/
+.project
+lib/
+openoffice-install.*
 
 # Mobile Tools for Java (J2ME)
 .mtj.tmp/

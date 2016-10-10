@@ -1,0 +1,374 @@
+<?xml version="1.0"?>
+<!-- Policy Machine -->
+
+<project xmlns:ivy="antlib:org.apache.ivy.ant" name="Policy Machine 1.4" default="clean-and-jar-all" basedir=".">
+
+    <description>Policy Machine (PM) v1.4 build file. This build has been altered dramatically from previous
+        PM build scripts.  It now supports dependency management of 3rd party libs.  It also attempts to lift as
+        much configuration as possible from the developer.  Hard coded variables are replaced with variables found at
+        build time or based on an initial configuration step.
+
+        It is designed around the idea that this buildfile should:
+        1.  ...be simple to use.  Hopefully requiring no manual steps.  Expert targets are provided for utility.
+        2   ...degrade gracefully, with contingencies should errors occur.  One error or missing library should not break the build.
+        3.  ...make it easy to incorporate new libraries and components.  Additions should require as few changes to the build as possible.
+    </description>
+
+    <target name="usage">
+        <echo>Usage for the Policy Machine build file:</echo>
+        <echo></echo>
+        <echo>default target is clean-and-jar-all</echo>
+        <echo></echo>
+        <echo>Other targets:</echo>
+        <echo></echo>
+        <echo>pristine          - same as clean all but removes ivy cache,</echo>
+        <echo>                    ivy install and openoffice-install.properties</echo>
+        <echo>jar-all           - create jar files, skipping those which</echo>
+        <echo>                    do not need updating</echo>
+        <echo>jar-*app-name*    - create jar for a specific application</echo>
+        <echo>build-all         - build all applications</echo>
+        <echo>build-*app-name*  - build a specific application from source</echo>
+        <echo></echo>
+        <echo>Valid applications/components:</echo>
+        <echo></echo>
+        <echo>Primary Components</echo>
+        <echo></echo>
+        <echo>operating-environment     - User entry-point to into the</echo>
+        <echo>                            policy machine system.</echo>
+        <echo>kernel-simulator          - Kernel Simulator</echo>
+        <echo>server        - The server component of the Policy Machine</echo>
+        <echo></echo>
+        <echo>Administrator Tools:</echo>
+        <echo></echo>
+        <echo>admin         - Administration Application</echo>
+        <echo></echo>
+        <echo>User Applications:</echo>
+        <echo></echo>
+        <echo>acctrec       - Account Records Editor</echo>
+        <echo>grant         - E-Grant</echo>
+        <echo>medrec        - Medical Records application</echo>
+        <echo>openoffice    - Open Office integration</echo>
+        <echo>msoffice      - MS Office integration. (Prototype: Non-functional)</echo>
+        <echo>rtf           - Rich Text Editor</echo>
+        <echo>rtfth         - Rich Text Editor (Trojan Horse demo)</echo>
+        <echo></echo>
+        <echo>Support Components:</echo>
+        <echo></echo>
+        <echo>commons       - A library containing commonly used classes </echo>
+        <echo>                shared by all applications.</echo>
+        <echo>exporter      - Data exporting tool</echo>
+
+
+    </target>
+
+    <!-- BEGIN CLIENT SPECIFIC CONFIG -->
+    <!-- CHANGE THESE BEFORE INSTALLING ON A NEW CLIENT -->
+    <!-- property name="pm.engine.name" value="ws-sys"/-->
+    <property name="pm.engine.name" value="ws-sys"/>
+    <property name="openoffice.dir" location="C:/Program Files (x86)/OpenOffice.org 3"/>
+    <property name="pm.work.directory" location="C:/PMWorkArea"/>
+    <!-- END CLIENT SPECIFIC CONFIG -->
+
+
+    <!-- Variables -->
+    <property name="pmversion" value="1.5"/>
+    <!-- Project Directories  -->
+    <property name="build" location="build"/>
+    <property name="dist" location="dist"/>
+    <property name="bin" location="bin"/>
+    <property name="conf" location="conf"/>
+    <property name="lib" location="lib"/>
+    <property name="root" location="."/>
+    <property name="src" location="src"/>
+    <property name="test-src" location="test-src"/>
+    <property name="test-build" location="test-build"/>
+    <property name="doc" location="doc"/>
+    <property name="ivy" location="ivy"/>
+    <property name="images" location="${src}/images"/>
+    <property name="javadoc" location="${doc}/javadoc"/>
+    <property name="keystores" location="keystores"/>
+    <!-- statically defined hostname, at least put these in a properties file, find out if we can aquire machine name algorithmically -->
+    <property environment="env"/>
+    <property name="env.HOSTNAME" value="${env.COMPUTERNAME}"/>
+    <property name="pm.host.name" value="${env.HOSTNAME}"/>
+    <property name="openoffice.install.settings.file" location="openoffice-install.properties"/>
+
+    <property name="javamail" location="lib"/>
+
+    <script language="javascript">
+        <![CDATA[
+        //I can't believe I couldn't convert to lowercase without resorting to scripting.
+        println("Converting env.HOSTNAME to lowercase value of:" + project.getProperty("env.HOSTNAME"));
+        project.setProperty("pm.host.name", project.getProperty("env.HOSTNAME").toLowerCase());
+
+
+        importPackage(java.io);
+        importPackage(java.lang);
+        importPackage(javax.swing);
+        importPackage(java.util);
+
+        var oo_install_props_file = new File(project.getProperty("openoffice.install.settings.file"));
+
+        function askForDirectoryLocation(title){
+            var root = project.getProperty("en") ;
+            var fc = new JFileChooser();
+            fc.setDialogTitle(title);
+            fc.setFileSelectionMode(JFileChooser.DIRECTORIES_ONLY);
+            fc.showDialog(null, "Choose");
+            return fc.getSelectedFile();
+        }
+        var oo_endpoints = {
+        "program" : "openoffice.program.dir"};
+
+        function findFile(name, current, max_depth){
+
+            //println("comparing " + current.getName() + " to " + name);
+            if(current.getName().equals(name)){
+                //println("true");
+                return current;
+            }
+            //println("false, continuing");
+            if(max_depth == null){
+                max_depth = 1;
+            }
+            if(current.isDirectory() && max_depth > 0){
+                //println("checking the contents of directory " + current.getAbsolutePath());
+                var entries = current.listFiles();
+                for(var i = 0; i < entries.length; i++){
+                    var found = findFile(name, entries[i], max_depth - 1);
+                    if(found != null){
+                        return found;
+                    }
+                }
+            }
+            return null;
+        }
+
+        function addPropertiesToProject(props){
+            println("props" + props)
+
+        }
+
+        var oo_install_dir = null;
+        var props = new Properties();
+        if(!oo_install_props_file.exists()){
+            while(oo_install_dir == null){
+                oo_install_dir = askForDirectoryLocation("Install Directory of Open Office.org");
+            }
+            props.setProperty("openoffice.dir", oo_install_dir.getAbsolutePath());
+            for(var name in oo_endpoints){
+                var ant_prop_name = oo_endpoints[name];
+                println("looking up location of prop" + ant_prop_name + "with value" + name);
+                var result = findFile(name, oo_install_dir, 5);
+                if(result != null){
+                    println("File(or directory) " + name + " found at " + result.getAbsolutePath());
+                    props.setProperty(ant_prop_name, result.getAbsolutePath());
+                }
+                else{
+                    println("Could not find the file(or dir) " + name);
+                }
+            }
+            props.store(new FileOutputStream(oo_install_props_file), "Generated paths to OpenOffice libs, erase this file to auto-regenerate");
+       }
+       else{
+            props.load(new FileInputStream(oo_install_props_file))
+            //JOptionPane.showMessageDialog(null, "Open Office config properties file exists!");
+        }
+
+        addPropertiesToProject(props);
+     ]]>
+    </script>
+    <!-- defines for commonly used keystore, truststore, and port settings -->
+    <property name="serverKeystore" value="serverKeystore"/>
+    <property name="serverTruststore" value="serverTruststore"/>
+    <property name="sesmgrKeystore" value="ws-sysKeystore"/>
+    <property name="clientTruststore" value="clientTruststore"/>
+    <property name="sesmgrSimPort" value="8081"/>
+    <property name="sesmgrExPort" value="8082"/>
+
+    <!--
+    defines for running a file through and ide (e.g. NetBeans}. These aren't used in this file
+    but in a file used by the IDE.
+    -->
+    <property name="runFileKeystore" value="${sesmgrKeystore}"/>
+    <property name="runFileTruststore" value="${clientTruststore}"/>
+    <property name="runFileSimPort" value="${sesmgrSimPort}"/>
+    <property name="runFileExPort" value="${sesmgrExPort}"/>
+
+    <!-- end IDE defines -->
+
+    <!-- Third-party classes and JAR files -->
+
+
+    <!-- Compiler properties -->
+    <property name="javac.nowarn" value="false"/>
+    <property name="javac.debug" value="on"/>
+    <property name="javac.deprecation" value="true"/>
+    <property name="javac.debuglevel" value="lines,vars,source"/>
+
+    <path id="library.dependencies.path">
+        <fileset dir="lib" includes="*.jar">
+            <exclude name="junit*.jar"/>
+            <exclude name="*sources.jar"/>
+            <exclude name="*javadoc.jar"/>
+        </fileset>
+    </path>
+
+    <path id="build.path">
+        <path refid="library.dependencies.path"/>
+
+    </path>
+
+    <path id="run.path">
+        <pathelement path="${dist}/pm-commons-${pmversion}.jar"/>
+        <path refid="build.path"/>
+    </path>
+
+    <path id="tests.build.path">
+        <path refid="build.path"/>
+        <pathelement path="${build}"/>
+        <fileset dir="lib" includes="junit*.jar">
+            <exclude name="*sources.jar"/>
+            <exclude name="*javadoc.jar"/>
+        </fileset>
+    </path>
+
+    <path id="tests.run.path">
+        <path refid="tests.build.path"/>
+        <pathelement path="${test-build}"/>
+    </path>
+
+    <path id="operating.environment.runpath">
+        <pathelement location="${dist}/pm-user-${pmversion}.jar"/>
+        <pathelement location="${dist}/pm-exporter-${pmversion}.jar"/>
+        <path refid="run.path"/>
+    </path>
+
+    <path id="fallback.runpath">
+        <pathelement location="${dist}/pm-${pmversion}.jar"/>
+        <path refid="build.path"/>
+    </path>
+
+
+    <!-- Helper Targets -->
+
+    <target name="copy-resources">
+        <copy todir="${build}/images">
+            <fileset dir="${images}"/>
+        </copy>
+    </target>
+    <!-- Clean Targets -->
+
+    <target name="make-dirs">
+        <mkdir dir="${test-build}"/>
+        <mkdir dir="${build}"/>
+        <mkdir dir="${build}/images"/>
+        <mkdir dir="${javadoc}"/>
+        <mkdir dir="${dist}"/>
+    </target>
+
+    <target name="clean-all">
+        <delete dir="${test-build}"/>
+        <delete dir="${build}"/>
+        <delete dir="${javadoc}"/>
+        <delete dir="${dist}"/>
+        <!-- Make new directories -->
+
+        <antcall target="make-dirs"/>
+    </target>
+    <!-- In this instance clean is just a pseudonym for clean-all.  Only provided because it's a well-known ant target -->
+    <target name="clean">
+        <antcall target="clean-all"/>
+    </target>
+
+    <!-- performs clean-all and removes artifacts created when ant was first run (Ivy and openoffice-install.properties) -->
+    <target name="pristine" depends="clean-all">
+        <delete file="${openoffice.install.settings.file}"/>
+    </target>
+
+    <target name="clean-and-jar-all">
+        <antcall target="clean-all"/>
+        <antcall target="jar-all"/>
+    </target>
+
+    <!-- Compile Targets -->
+	
+    <target name="build-all"
+            depends="build-HttpServer">
+        <javac debug="${javac.debug}" debuglevel="${javac.debuglevel}" nowarn="${javac.nowarn}"
+               deprecation="${javac.deprecation}" srcdir="${src}" destdir="${build}" listfiles="yes"
+               includeantruntime="false">
+            <classpath refid="build.path"/>
+        </javac>
+    </target>
+    <target name="build-commons" depends="copy-resources">
+
+        <javac debug="${javac.debug}" debuglevel="${javac.debuglevel}" nowarn="${javac.nowarn}"
+               deprecation="${javac.deprecation}" srcdir="${src}" destdir="${build}"
+               includes="gov/nist/csd/pm/common/**">
+            <classpath refid="build.path"/>
+        </javac>
+    </target>
+
+	<target name="build-HttpServer" depends="build-commons">
+	        <javac debug="${javac.debug}"
+	               debuglevel="${javac.debuglevel}"
+	               nowarn="${javac.nowarn}"
+	               deprecation="${javac.deprecation}"
+	               srcdir="${src}" destdir="${build}"
+	               includes="gov/nist/csd/pm/application/HttpServer/**">
+	            <classpath refid="build.path"/>
+	        </javac>
+	    </target>
+    <!-- PREPARE BATCH AND CONFIGURATION FILES -->
+
+
+
+    <!-- END PREPARE BATCH AND CONFIGRUATION FILES -->
+
+    <!-- Dist Targets -->
+    <target name="jar-all" description="Builds and prepares the Authorization Engine"
+            depends="jar-HttpServer">
+        <jar destfile="${dist}/pm-${pmversion}.jar" basedir="${build}"/>
+    </target>
+
+	<!--        CREATE COMPONENT ONLY JAR FILES        -->
+
+	<target name="jar-commons" description="Prepares a jar containing classes common to all applications"
+            depends="build-commons">
+        <jar destfile="${dist}/pm-commons-${pmversion}.jar"
+             basedir="${build}"
+             includes="
+    				gov/nist/csd/pm/common/** 
+					images/*
+    				images/common/**">
+            <manifest>
+                <attribute name="Main-Class" value="gov.nist.csd.pm.application.grantor.Grantor"/>
+            </manifest>
+        </jar>
+    </target>
+
+    <!--     Application JAR file targets  -->
+
+
+	<target name="jar-HttpServer" description="Prepares Httpserver for PM and OpenStack integration"
+	            depends="jar-commons,build-HttpServer">
+	        <jar destfile="${dist}/pm-app-httpserver-${pmversion}.jar" basedir="${build}"
+	             includes="gov/nist/csd/pm/application/HttpServer/**
+						   images/**">
+	            <manifest>
+	                <attribute name="Main-Class" value="gov.nist.csd.pm.application.HttpServer.Main"/>
+	            </manifest>
+	        </jar>
+	    </target>
+    <!-- Remote Debugging Settings -->
+
+    <condition property="debug.connection.settings"
+               value="-Xdebug -Xrunjdwp:transport=dt_socket,suspend=y,server=y,address=8978"
+               else="">
+        <istrue value="${javac.debug}"/>
+    </condition>
+
+    <!-- Run Targets depends build-tests, make-dirs -->
+
+</project>
