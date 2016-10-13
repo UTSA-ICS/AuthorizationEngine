@@ -1,10 +1,9 @@
 <?xml version="1.0"?>
-<!-- Policy Machine -->
+<!-- Authorization Engine for Policy Machine and OpenStack -->
 
-<project xmlns:ivy="antlib:org.apache.ivy.ant" name="Policy Machine 1.4" default="clean-and-jar-all" basedir=".">
+<project xmlns:ivy="antlib:org.apache.ivy.ant" name="Authorization Engine 1.5" default="clean-and-jar-all" basedir=".">
 
-    <description>Policy Machine (PM) v1.4 build file. This build has been altered dramatically from previous
-        PM build scripts.  It now supports dependency management of 3rd party libs.  It also attempts to lift as
+    <description>Authorization Engine (AE) v1.5 build file. It also attempts to lift as
         much configuration as possible from the developer.  Hard coded variables are replaced with variables found at
         build time or based on an initial configuration step.
 
@@ -15,7 +14,7 @@
     </description>
 
     <target name="usage">
-        <echo>Usage for the Policy Machine build file:</echo>
+        <echo>Usage for the Authorization Engine build file:</echo>
         <echo></echo>
         <echo>default target is clean-and-jar-all</echo>
         <echo></echo>
@@ -71,7 +70,7 @@
 
 
     <!-- Variables -->
-    <property name="pmversion" value="1.5"/>
+    <property name="aeversion" value="1.5"/>
     <!-- Project Directories  -->
     <property name="build" location="build"/>
     <property name="dist" location="dist"/>
@@ -220,7 +219,7 @@
     </path>
 
     <path id="run.path">
-        <pathelement path="${dist}/pm-commons-${pmversion}.jar"/>
+        <pathelement path="${dist}/pm-commons-${aeversion}.jar"/>
         <path refid="build.path"/>
     </path>
 
@@ -239,24 +238,19 @@
     </path>
 
     <path id="operating.environment.runpath">
-        <pathelement location="${dist}/pm-user-${pmversion}.jar"/>
-        <pathelement location="${dist}/pm-exporter-${pmversion}.jar"/>
+        <pathelement location="${dist}/pm-user-${aeversion}.jar"/>
+        <pathelement location="${dist}/pm-exporter-${aeversion}.jar"/>
         <path refid="run.path"/>
     </path>
 
     <path id="fallback.runpath">
-        <pathelement location="${dist}/pm-${pmversion}.jar"/>
+        <pathelement location="${dist}/pm-${aeversion}.jar"/>
         <path refid="build.path"/>
     </path>
 
 
     <!-- Helper Targets -->
 
-    <target name="copy-resources">
-        <copy todir="${build}/images">
-            <fileset dir="${images}"/>
-        </copy>
-    </target>
     <!-- Clean Targets -->
 
     <target name="make-dirs">
@@ -301,16 +295,8 @@
             <classpath refid="build.path"/>
         </javac>
     </target>
-    <target name="build-commons" depends="copy-resources">
 
-        <javac debug="${javac.debug}" debuglevel="${javac.debuglevel}" nowarn="${javac.nowarn}"
-               deprecation="${javac.deprecation}" srcdir="${src}" destdir="${build}"
-               includes="gov/nist/csd/pm/common/**">
-            <classpath refid="build.path"/>
-        </javac>
-    </target>
-
-	<target name="build-HttpServer" depends="build-commons">
+	<target name="build-HttpServer">
 	        <javac debug="${javac.debug}"
 	               debuglevel="${javac.debuglevel}"
 	               nowarn="${javac.nowarn}"
@@ -329,31 +315,17 @@
     <!-- Dist Targets -->
     <target name="jar-all" description="Builds and prepares the Authorization Engine"
             depends="jar-HttpServer">
-        <jar destfile="${dist}/pm-${pmversion}.jar" basedir="${build}"/>
+        <jar destfile="${dist}/ae-${aeversion}.jar" basedir="${build}"/>
     </target>
 
 	<!--        CREATE COMPONENT ONLY JAR FILES        -->
 
-	<target name="jar-commons" description="Prepares a jar containing classes common to all applications"
-            depends="build-commons">
-        <jar destfile="${dist}/pm-commons-${pmversion}.jar"
-             basedir="${build}"
-             includes="
-    				gov/nist/csd/pm/common/** 
-					images/*
-    				images/common/**">
-            <manifest>
-                <attribute name="Main-Class" value="gov.nist.csd.pm.application.grantor.Grantor"/>
-            </manifest>
-        </jar>
-    </target>
-
     <!--     Application JAR file targets  -->
 
 
-	<target name="jar-HttpServer" description="Prepares Httpserver for PM and OpenStack integration"
-	            depends="jar-commons,build-HttpServer">
-	        <jar destfile="${dist}/pm-app-httpserver-${pmversion}.jar" basedir="${build}"
+	<target name="jar-HttpServer" description="Prepares Authorization Engine for PM and OpenStack integration"
+	            depends="build-HttpServer">
+	        <jar destfile="${dist}/pm-app-httpserver-${aeversion}.jar" basedir="${build}"
 	             includes="gov/nist/csd/pm/application/HttpServer/**
 						   images/**">
 	            <manifest>
