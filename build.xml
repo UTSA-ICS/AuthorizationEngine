@@ -326,8 +326,7 @@
 	<target name="jar-HttpServer" description="Prepares Authorization Engine for PM and OpenStack integration"
 	            depends="build-HttpServer">
 	        <jar destfile="${dist}/pm-app-httpserver-${aeversion}.jar" basedir="${build}"
-	             includes="gov/nist/csd/pm/application/HttpServer/**
-						   images/**">
+	             includes="gov/nist/csd/pm/application/HttpServer/**">
 	            <manifest>
 	                <attribute name="Main-Class" value="gov.nist.csd.pm.application.HttpServer.Main"/>
 	            </manifest>
