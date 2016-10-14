@@ -9,6 +9,6 @@ This is an authorization component for enforcing a User-Attribute Enhanced OpenS
 2. In the build path of AE project, PM project should be added under "Projects" for a successful build. 
 3. The Main.java is the main class for AE and requires following program and VM arguments.
   1. Program argument:
-    '-enginehost $host_ip$ -engineport 8080 -debug'
+    `-enginehost $host_ip$ -engineport 8080 -debug`
   2. VM arguments: 
-    '-Djavax.net.ssl.keyStore=$keystore_path$ -Djavax.net.ssl.keyStorePassword=aaaaaa -Djavax.net.ssl.trustStore=$truststore_path$
+    `-Djavax.net.ssl.keyStore=$keystore_path$ -Djavax.net.ssl.keyStorePassword=aaaaaa -Djavax.net.ssl.trustStore=$truststore_path$`
